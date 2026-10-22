@@ -1,0 +1,17 @@
+CULEBRITA — app instalable
+
+Esta carpeta es la app completa. Para instalarla en un celular tiene que estar
+publicada en internet con https. La forma gratis y permanente es GitHub Pages:
+
+1. Crea una cuenta en github.com (si no tienes).
+2. Crea un repositorio nuevo, público, llamado "culebrita".
+3. Toca "uploading an existing file" y arrastra TODO el contenido de esta carpeta
+   (index.html, manifest.webmanifest, sw.js y la carpeta icons). Guarda con "Commit changes".
+4. Ve a Settings > Pages. En "Branch" elige "main" y "/ (root)" y toca Save.
+5. En uno o dos minutos la app queda en: https://TU-USUARIO.github.io/culebrita/
+
+Para instalarla:
+- iPhone: abre el link en Safari > Compartir > "Agregar a inicio".
+- Android: abre el link en Chrome > menú ⋮ > "Instalar app".
+
+Para publicar una versión nueva: sube los archivos nuevos encima de los anteriores.
