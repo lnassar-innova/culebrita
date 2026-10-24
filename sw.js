@@ -1,6 +1,6 @@
-// Culebrita 1.1: guarda la app en el celular para que funcione sin internet.
+// Culebrita 1.2: guarda la app en el celular para que funcione sin internet.
 // Al subir una versión nueva, cambia el número de CACHE para que los celulares la descarguen.
-const CACHE = 'culebrita-1.1';
+const CACHE = 'culebrita-1.2';
 const FILES = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png', './icons/favicon-32.png'];

@@ -208,7 +208,7 @@ button{font:inherit;color:inherit}
 <body>
 <div class="app">
   <header class="top">
-    <span class="brand">Culebrita<span class="ver" id="ver">v1.1</span></span>
+    <span class="brand">Culebrita<span class="ver" id="ver">v1.2</span></span>
     <div class="top-r">
       <button class="chip" id="b-install" type="button" hidden>Instalar</button>
       <span class="grille" id="grille" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
@@ -334,12 +334,16 @@ const CRITTER_EVERY = 5, CRITTER_POINTS = 3;
 const intervalFor = lvl => Math.max(MIN_MS, Math.round(BASE_MS * Math.pow(SPEEDUP, lvl - 1)));
 
 /* ---------- Animals the snake can eat (8x5 sprites, facing right) ----------
-   mouse:  scurries sideways, sometimes changes row
-   frog:   sits still, then jumps two squares in any direction
-   bird:   pecks in place, flies away twice if the snake gets close
-   lizard: quick dashes, then freezes                                         */
+   All of them wander like the mouse; they differ only a little in speed
+   (ms per step) and in how often they change row instead of going sideways. */
 const KINDS = ['mouse', 'frog', 'bird', 'lizard'];
-const LIFE = { mouse: 7000, frog: 7500, bird: 9000, lizard: 6500 };
+const CRITTER_LIFE = 7000;
+const MOVES = {
+  mouse:  { step: 380, vert: 0.14 },
+  frog:   { step: 430, vert: 0.30 },
+  bird:   { step: 400, vert: 0.22 },
+  lizard: { step: 340, vert: 0.08 }
+};
 const CRITTER_SPR = {
   mouse: [
     ['........', '#...##..', '.####.#.', '.#######', '..#..#..'],
@@ -351,8 +355,7 @@ const CRITTER_SPR = {
   ],
   bird: [
     ['....##..', '...#.###', '#.#####.', '.#####..', '...#.#..'],
-    ['........', '....##..', '#..#.##.', '.######.', '...#.#.#'],
-    ['##....##', '..#..#..', '...##...', '..####..', '........']
+    ['........', '....##..', '#..#.##.', '.######.', '...#.#.#']
   ],
   lizard: [
     ['..#...#.', '...####.', '#.######', '.#.####.', '....#..#'],
@@ -380,9 +383,9 @@ for (const k in GLYPHS) FONT[k] = GLYPHS[k].split('|');
 
 const SPR = {
   food: ['.#.', '#.#', '.#.'],
-  // Heads are 5 across (one pixel wider than the body on each side) and 5 along (the last column reaches into the next square)
-  head: ['.##..', '##.#.', '####.', '##.#.', '.##..'],
-  headOpen: ['.####', '##.#.', '###..', '##.#.', '.####'],
+  // Heads are 5 across (one pixel wider than the body on each side); the mouth opens inside the head
+  head: ['.##.', '#.##', '####', '#.##', '.##.'],
+  headOpen: ['.###', '#.#.', '##..', '#.#.', '.###'],
   tail: ['.##', '###', '.##'],
   crown: ['..#..', '#.#.#', '#####', '#####']
 };
@@ -452,7 +455,6 @@ const sfx = {
     else { tone(880, 0, 0.06, 0.05); tone(1760, 0.07, 0.1, 0.05); }
     buzz(30);
   },
-  flee() { tone(500, 0, 0.14, 0.035, 1600); },
   level() { [660, 880, 1320].forEach((f, i) => tone(f, i * 0.055, 0.05, 0.04)); },
   die() { tone(440, 0, 0.5, 0.06, 90); buzz(180); },
   record() { [523, 659, 784, 1046].forEach((f, i) => tone(f, i * 0.09, 0.08, 0.045)); }
@@ -460,7 +462,6 @@ const sfx = {
 
 /* ---------- Game engine ---------- */
 const rand = n => (Math.random() * n) | 0;
-function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 function wrapDist(a, b, n, wrap) { const d = Math.abs(a - b); return wrap ? Math.min(d, n - d) : d; }
 function dirBetween(a, b) {
   let dx = b.x - a.x, dy = b.y - a.y;
@@ -502,10 +503,7 @@ function makeGame(walls) {
     for (let t = 0; t < 300; t++) {
       const x = rand(COLS - 1), y = rand(ROWS);
       if (fits(x, y) && Math.abs(x - h.x) + Math.abs(y - h.y) >= 5) {
-        g.critter = {
-          kind, x, y, f: Math.random() < 0.5 ? 1 : -1, life: LIFE[kind], total: LIFE[kind],
-          acc: 0, frame: 0, air: 0, flees: 0, dir: Math.random() < 0.5 ? 1 : 3, run: 3 + rand(3), rest: 300
-        };
+        g.critter = { kind, x, y, f: Math.random() < 0.5 ? 1 : -1, life: CRITTER_LIFE, total: CRITTER_LIFE, acc: 0, frame: 0 };
         g.lastKind = kind;
         return true;
       }
@@ -517,70 +515,20 @@ function makeGame(walls) {
     c.x += dx; c.y += dy; return true;
   };
   function walk(c) {
-    const r = Math.random();
-    if (r < 0.18) c.f = -c.f;
+    const m = MOVES[c.kind];
+    if (Math.random() < 0.18) c.f = -c.f;
     let moved = false;
-    if (r > 0.86) moved = tryMove(c, 0, Math.random() < 0.5 ? -1 : 1);
+    if (Math.random() < m.vert) moved = tryMove(c, 0, Math.random() < 0.5 ? -1 : 1);
     for (let k = 0; k < 2 && !moved; k++) { if (tryMove(c, c.f, 0)) moved = true; else c.f = -c.f; }
     if (moved) c.frame ^= 1;
-  }
-  function hop(c) {
-    for (const d of shuffle([0, 1, 2, 3])) for (const n of [2, 1]) {
-      if (tryMove(c, DX[d] * n, DY[d] * n)) { if (DX[d]) c.f = DX[d]; c.frame = 1; c.air = 230; return; }
-    }
-  }
-  function dash(c) {
-    if (!tryMove(c, DX[c.dir], DY[c.dir])) {
-      const opts = [0, 1, 2, 3].filter(d => fits(c.x + DX[d], c.y + DY[d]));
-      if (!opts.length) return;
-      c.dir = opts[rand(opts.length)];
-      tryMove(c, DX[c.dir], DY[c.dir]);
-    }
-    if (DX[c.dir]) c.f = DX[c.dir];
-    c.frame ^= 1;
-  }
-  function flyAway(c) {
-    const h = g.snake[0];
-    for (let t = 0; t < 250; t++) {
-      const x = rand(COLS - 1), y = rand(ROWS);
-      if (fits(x, y) && Math.abs(x - h.x) + Math.abs(y - h.y) >= 7) {
-        c.x = x; c.y = y; c.flees++; c.frame = 2; c.air = 380; c.f = x > h.x ? 1 : -1;
-        if (g.on.flee) g.on.flee();
-        return;
-      }
-    }
-    c.flees = 2;
   }
   g.tickCritter = dt => {
     const c = g.critter; if (!c) return;
     c.life -= dt;
     if (c.life <= 0) { g.critter = null; return; }
-    if (c.air > 0) { c.air -= dt; if (c.air <= 0) c.frame = 0; }
-    if (c.kind === 'mouse') {
-      c.acc += dt;
-      while (c.acc >= 380) { c.acc -= 380; walk(c); }
-    } else if (c.kind === 'frog') {
-      c.acc += dt;
-      if (c.acc >= 1050) { c.acc = -rand(350); hop(c); }
-    } else if (c.kind === 'lizard') {
-      if (c.rest > 0) { c.rest -= dt; return; }
-      c.acc += dt;
-      while (c.acc >= 140 && c.rest <= 0) {
-        c.acc -= 140; dash(c);
-        if (--c.run <= 0) {
-          c.run = 3 + rand(4); c.rest = 450 + rand(600); c.acc = 0;
-          if (Math.random() < 0.5) c.dir = Math.random() < 0.75 ? (Math.random() < 0.5 ? 1 : 3) : (Math.random() < 0.5 ? 0 : 2);
-        }
-      }
-    } else if (c.kind === 'bird') {
-      const h = g.snake[0], wrap = !g.walls;
-      const dist = Math.min(wrapDist(h.x, c.x, COLS, wrap), wrapDist(h.x, c.x + 1, COLS, wrap)) + wrapDist(h.y, c.y, ROWS, wrap);
-      if (c.flees < 2 && dist <= 2) { flyAway(c); return; }
-      if (c.air <= 0) {
-        c.acc += dt;
-        if (c.acc >= 520) { c.acc = 0; c.frame = Math.random() < 0.45 ? 1 : 0; if (Math.random() < 0.2) c.f = -c.f; }
-      }
-    }
+    const step = MOVES[c.kind].step;
+    c.acc += dt;
+    while (c.acc >= step) { c.acc -= step; walk(c); }
   };
   g.turn = d => {
     const ref = g.queue.length ? g.queue[g.queue.length - 1] : g.dir;
@@ -881,7 +829,6 @@ function startGame() {
   game.on.eat = sfx.eat;
   game.on.level = sfx.level;
   game.on.critter = sfx.critter;
-  game.on.flee = sfx.flee;
   game.on.die = () => { dyingT = 1100; setMode('dying'); sfx.die(); wake(false); };
   game.on.win = () => { dyingT = 900; setMode('dying'); sfx.record(); wake(false); };
   acc = 0; readyT = 900; result = null;
