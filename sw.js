@@ -1,6 +1,6 @@
-// Culebrita 1.0.0: guarda la app en el celular para que funcione sin internet.
+// Culebrita 1.1: guarda la app en el celular para que funcione sin internet.
 // Al subir una versión nueva, cambia el número de CACHE para que los celulares la descarguen.
-const CACHE = 'culebrita-1.0.0';
+const CACHE = 'culebrita-1.1';
 const FILES = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png', './icons/favicon-32.png'];
@@ -10,7 +10,7 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k.startsWith('culebrita-') && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
@@ -22,6 +22,6 @@ self.addEventListener('fetch', e => {
     return res;
   }).catch(() => null);
   e.waitUntil(net);
-  e.respondWith(caches.match(req, { ignoreSearch: true })
+  e.respondWith(caches.open(CACHE).then(c => c.match(req, { ignoreSearch: true }))
     .then(hit => hit || net.then(res => res || caches.match('./index.html'))));
 });
